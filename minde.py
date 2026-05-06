@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QLineEdit, QTextEdit
+    QPushButton, QLabel, QLineEdit, QTextEdit, QInputDialog
 )
 from PySide6.QtCore import Qt, QThread, Signal
 
@@ -10,9 +10,10 @@ import socket
 HOST = "10.154.1.24"
 PORT = 1357
 
+list = []
+
 
 class ReceiverThread(QThread):
-    """En separat tråd som lyssnar efter svar från servern utan att frysa GUI:t."""
     received = Signal(str)
 
     def __init__(self, sock):
@@ -41,20 +42,32 @@ class ReceiverThread(QThread):
 class MyWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Joe's Exposed Hidden Secrets - Chat")
+        self.setWindowTitle("Chat System: Created by Goats🐐")
         self.resize(700, 600)
 
         self.socket = None
         self.receiver_thread = None
+        self.username = "Anonym"
 
         self.layout = QVBoxLayout(self)
         self.setup_ui()
 
+        self.get_username()
         self.connect_to_server()
 
-    def setup_ui(self):
+    def get_username(self):
+        """Användaren skriver själv in sitt användarnamn"""
+        username, ok = QInputDialog.getText(
+            self, 
+            "Välkommen till chatten",
+            "Ange ditt användarnamn:",
+        )
+        if ok and username.strip():
+            self.username = username.strip()
 
-        self.maintitle = QLabel("Joe's dark secret Course", alignment=Qt.AlignCenter)
+
+    def setup_ui(self):
+        self.maintitle = QLabel("Goats🐐", alignment=Qt.AlignCenter)
         self.maintitle.setStyleSheet("font-size: 24px; font-weight: bold;")
         self.layout.addWidget(self.maintitle)
 
@@ -84,6 +97,7 @@ class MyWindow(QWidget):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((HOST, PORT))
             self.chat_display.append("<span style='color: lime;'>Ansluten till servern!</span>")
+            self.chat_display.append(f"<span style='color: cyan;'>Inloggad som: <b>{self.username}</b></span>")
 
             self.receiver_thread = ReceiverThread(self.socket)
             self.receiver_thread.received.connect(self.display_message)
@@ -93,25 +107,28 @@ class MyWindow(QWidget):
             self.chat_display.append(f"<span style='color: red;'>Kunde inte ansluta: {e}</span>")
 
     def display_message(self, text: str):
-        """Visar mottaget meddelande i chatten."""
-        self.chat_display.append(f"<b>Server:</b> {text}")
+        self.chat_display.append(text)
 
     def send_message(self):
-        """Skickar meddelandet från input-fältet."""
         if not self.socket:
             self.chat_display.append("<span style='color: red;'>Inte ansluten!</span>")
             return
+        
+        if message.startswith() == "/mute":
+            append.list
 
         message = self.inputbox.text().strip()
         if not message:
             return
 
+        full_message = f"{self.username}:> {message}"
+
         try:
+            
+            self.chat_display.append(f"<b style='color: #00ff88;'>[{self.username}]</b> {message}")
 
-            self.chat_display.append(f"<b>Du:</b> {message}")
-
-            self.socket.sendall(message.encode("utf-8"))
-
+            
+            self.socket.sendall(full_message.encode("utf-8"))
 
             self.inputbox.clear()
 
@@ -119,17 +136,17 @@ class MyWindow(QWidget):
             self.chat_display.append(f"<span style='color: red;'>Fel vid sändning: {e}</span>")
 
     def send_test_message(self):
-        """Din gamla r6-knapp – skickar ett testmeddelande."""
         self.inputbox.setText("R6 gods right here (2-7 mot the LDP Boys)")
         self.send_message()
 
     def closeEvent(self, event):
-        """Städar upp när fönstret stängs."""
         if self.receiver_thread:
             self.receiver_thread.stop()
         if self.socket:
             self.socket.close()
         event.accept()
+
+    
 
 
 if __name__ == "__main__":
