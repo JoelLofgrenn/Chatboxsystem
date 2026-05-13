@@ -1,3 +1,6 @@
+#Goated Stuff av Mig Joe och Rasmus.........
+
+
 import sys
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
@@ -7,9 +10,11 @@ from PySide6.QtCore import Qt, QThread, Signal
 
 import socket
 
-HOST = "10.153.212.104"
+# server stuff
+HOST = "10.153.212.59"
 PORT = 1357
 
+# Mute lista som användare kommer att hamna i om de e dumma
 muted_users = []
 
 
@@ -66,7 +71,7 @@ class MyWindow(QWidget):
 
         input_layout = QHBoxLayout()
         self.input = QLineEdit()
-        self.input.setPlaceholderText("Skriv meddelande... (/mute namn | /unmute namn | /mutelist)")
+        self.input.setPlaceholderText("Skriv meddelande... (/mute namn | /unmute namn | /mutelist | /weather)")
         self.input.returnPressed.connect(self.send_message)
 
         send_btn = QPushButton("Skicka")
@@ -75,11 +80,16 @@ class MyWindow(QWidget):
         input_layout.addWidget(self.input, stretch=1)
         input_layout.addWidget(send_btn)
         layout.addLayout(input_layout)
+    
+    # Ange användarnamn
 
     def get_username(self):
         name, ok = QInputDialog.getText(self, "Användarnamn", "Ange ditt namn:")
         if ok and name.strip():
             self.username = name.strip()
+
+    
+    # Connecta till server via socket
 
     def connect_to_server(self):
         try:
@@ -93,6 +103,8 @@ class MyWindow(QWidget):
             self.receiver_thread.start()
         except Exception as e:
             self.chat.append(f"Kunde inte ansluta: {e}")
+        
+    # Kollar om Användaren är Mutead
 
     def is_muted(self, name):
         return name.lower() in [x.lower() for x in muted_users]
@@ -100,7 +112,7 @@ class MyWindow(QWidget):
     def handle_message(self, text):
         if ":> " in text:
             raw_sender = text.split(":> ", 1)[0]
-            # Plocka ut bara användarnamnet
+            # Plocka ut bara användarnamnet (aka goated strip)
             sender = raw_sender.split(": ")[-1].strip()
             if self.is_muted(sender):
                 return  # Visa ingenting, hoppa över meddelandet
@@ -114,6 +126,8 @@ class MyWindow(QWidget):
         msg = self.input.text().strip()
         if not msg:
             return
+        
+        lower_msg = msg.lower()
 
         # Visa mutelistan
         if msg.lower() == "/mutelist":
@@ -151,6 +165,36 @@ class MyWindow(QWidget):
             self.input.clear()
             return
 
+        # Väder i Borlänge
+        if lower_msg.startswith("/weather"):
+            try:
+                # Kolla om användaren skrev en stad
+                if len(msg) > 8 and msg[8].isspace():
+                    city = msg[9:].strip()
+                else:
+                    city = ""
+
+                if not city:
+                    self.chat.append("🌤️ Användning: /weather <stad>")
+                    self.chat.append("Exempel: /weather Stockholm, /weather London, /weather Malmö")
+                    self.input.clear()
+                    return
+
+                import urllib.request
+                url = f"https://wttr.in/{city}?format=%C+%t+%w+%h"
+                req = urllib.request.Request(url, headers={"User-Agent": "curl/7.68"})
+                
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    weather = resp.read().decode("utf-8").strip()
+                
+                self.chat.append(f"🌤️ Väder i {city}: {weather}")
+                
+            except Exception:
+                self.chat.append(f"⚠️ Kunde inte hämta väder för '{city}'. Prova en annan stad.")
+            
+            self.input.clear()
+            return
+
         # Vanligt meddelande
         try:
             self.chat.append(f"[{self.username}] {msg}")
@@ -158,7 +202,8 @@ class MyWindow(QWidget):
             self.input.clear()
         except:
             pass
-
+    
+    # Vet inte vad detta är antagligen tar bort connection med server
     def closeEvent(self, event):
         if self.receiver_thread:
             self.receiver_thread.stop()
