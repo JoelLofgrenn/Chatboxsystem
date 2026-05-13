@@ -7,10 +7,10 @@ from PySide6.QtCore import Qt, QThread, Signal
 
 import socket
 
-HOST = "10.154.1.24"
+HOST = "10.153.212.104"
 PORT = 1357
 
-list = []
+muted_users = []
 
 
 class ReceiverThread(QThread):
@@ -26,11 +26,10 @@ class ReceiverThread(QThread):
             try:
                 data = self.sock.recv(1024)
                 if data:
-                    message = data.decode("utf-8", errors="ignore")
-                    self.received.emit(message)
+                    self.received.emit(data.decode("utf-8", errors="ignore"))
                 else:
                     break
-            except Exception:
+            except:
                 break
 
     def stop(self):
@@ -49,95 +48,116 @@ class MyWindow(QWidget):
         self.receiver_thread = None
         self.username = "Anonym"
 
-        self.layout = QVBoxLayout(self)
-        self.setup_ui()
+        layout = QVBoxLayout(self)
+        self.setup_ui(layout)
 
         self.get_username()
         self.connect_to_server()
 
-    def get_username(self):
-        """Användaren skriver själv in sitt användarnamn"""
-        username, ok = QInputDialog.getText(
-            self, 
-            "Välkommen till chatten",
-            "Ange ditt användarnamn:",
-        )
-        if ok and username.strip():
-            self.username = username.strip()
+    def setup_ui(self, layout):
+        title = QLabel("Goats🐐", alignment=Qt.AlignCenter)
+        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        layout.addWidget(title)
 
-
-    def setup_ui(self):
-        self.maintitle = QLabel("Goats🐐", alignment=Qt.AlignCenter)
-        self.maintitle.setStyleSheet("font-size: 24px; font-weight: bold;")
-        self.layout.addWidget(self.maintitle)
-
-        self.chat_display = QTextEdit()
-        self.chat_display.setReadOnly(True)
-        self.chat_display.setStyleSheet("background-color: #1e1e1e; color: #ffffff; font-family: Consolas;")
-        self.layout.addWidget(self.chat_display, stretch=1)
+        self.chat = QTextEdit()
+        self.chat.setReadOnly(True)
+        self.chat.setStyleSheet("background-color: #1e1e1e; color: #ffffff;")
+        layout.addWidget(self.chat, stretch=1)
 
         input_layout = QHBoxLayout()
-        self.inputbox = QLineEdit()
-        self.inputbox.setPlaceholderText("Skriv meddelande här och tryck Enter...")
-        self.inputbox.returnPressed.connect(self.send_message)
+        self.input = QLineEdit()
+        self.input.setPlaceholderText("Skriv meddelande... (/mute namn | /unmute namn | /mutelist)")
+        self.input.returnPressed.connect(self.send_message)
 
-        self.send_button = QPushButton("Skicka")
-        self.send_button.clicked.connect(self.send_message)
+        send_btn = QPushButton("Skicka")
+        send_btn.clicked.connect(self.send_message)
 
-        input_layout.addWidget(self.inputbox, stretch=1)
-        input_layout.addWidget(self.send_button)
-        self.layout.addLayout(input_layout)
+        input_layout.addWidget(self.input, stretch=1)
+        input_layout.addWidget(send_btn)
+        layout.addLayout(input_layout)
 
-        self.buttonone = QPushButton("Fortnite (skicka testmeddelande)")
-        self.buttonone.clicked.connect(self.send_test_message)
-        self.layout.addWidget(self.buttonone)
+    def get_username(self):
+        name, ok = QInputDialog.getText(self, "Användarnamn", "Ange ditt namn:")
+        if ok and name.strip():
+            self.username = name.strip()
 
     def connect_to_server(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((HOST, PORT))
-            self.chat_display.append("<span style='color: lime;'>Ansluten till servern!</span>")
-            self.chat_display.append(f"<span style='color: cyan;'>Inloggad som: <b>{self.username}</b></span>")
+            self.chat.append("Ansluten till servern!")
+            self.chat.append(f"Inloggad som: {self.username}")
 
             self.receiver_thread = ReceiverThread(self.socket)
-            self.receiver_thread.received.connect(self.display_message)
+            self.receiver_thread.received.connect(self.handle_message)
             self.receiver_thread.start()
-
         except Exception as e:
-            self.chat_display.append(f"<span style='color: red;'>Kunde inte ansluta: {e}</span>")
+            self.chat.append(f"Kunde inte ansluta: {e}")
 
-    def display_message(self, text: str):
-        self.chat_display.append(text)
+    def is_muted(self, name):
+        return name.lower() in [x.lower() for x in muted_users]
+
+    def handle_message(self, text):
+        if ":> " in text:
+            raw_sender = text.split(":> ", 1)[0]
+            # Plocka ut bara användarnamnet
+            sender = raw_sender.split(": ")[-1].strip()
+            if self.is_muted(sender):
+                return  # Visa ingenting, hoppa över meddelandet
+
+        self.chat.append(text)
 
     def send_message(self):
         if not self.socket:
-            self.chat_display.append("<span style='color: red;'>Inte ansluten!</span>")
-            return
-        
-        if message.startswith() == "/mute":
-            append.list
-
-        message = self.inputbox.text().strip()
-        if not message:
             return
 
-        full_message = f"{self.username}:> {message}"
+        msg = self.input.text().strip()
+        if not msg:
+            return
 
+        # Visa mutelistan
+        if msg.lower() == "/mutelist":
+            if muted_users:
+                users = ", ".join(muted_users)
+                self.chat.append(f"🔇 Mutade användare: {users}")
+            else:
+                self.chat.append("🔇 Mutelistan är tom.")
+            self.input.clear()
+            return
+
+        # Lägg till mute
+        if msg.lower().startswith("/mute "):
+            name = msg[6:].strip()
+            if name:
+                lower_name = name.lower()
+                if lower_name not in [x.lower() for x in muted_users]:
+                    muted_users.append(name)
+                    self.chat.append(f"🔇 {name} är nu mutad.")
+                else:
+                    self.chat.append(f"⚠️ {name} är redan mutad.")
+            self.input.clear()
+            return
+
+        # Ta bort mute
+        if msg.lower().startswith("/unmute "):
+            name = msg[8:].strip()
+            if name:
+                match = next((x for x in muted_users if x.lower() == name.lower()), None)
+                if match:
+                    muted_users.remove(match)
+                    self.chat.append(f"🔊 {name} är nu unmutad.")
+                else:
+                    self.chat.append(f"⚠️ {name} finns inte i mutelistan.")
+            self.input.clear()
+            return
+
+        # Vanligt meddelande
         try:
-            
-            self.chat_display.append(f"<b style='color: #00ff88;'>[{self.username}]</b> {message}")
-
-            
-            self.socket.sendall(full_message.encode("utf-8"))
-
-            self.inputbox.clear()
-
-        except Exception as e:
-            self.chat_display.append(f"<span style='color: red;'>Fel vid sändning: {e}</span>")
-
-    def send_test_message(self):
-        self.inputbox.setText("R6 gods right here (2-7 mot the LDP Boys)")
-        self.send_message()
+            self.chat.append(f"[{self.username}] {msg}")
+            self.socket.sendall(f"{self.username}:> {msg}".encode("utf-8"))
+            self.input.clear()
+        except:
+            pass
 
     def closeEvent(self, event):
         if self.receiver_thread:
@@ -146,11 +166,9 @@ class MyWindow(QWidget):
             self.socket.close()
         event.accept()
 
-    
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MyWindow()
-    window.show()
+    win = MyWindow()
+    win.show()
     sys.exit(app.exec())
